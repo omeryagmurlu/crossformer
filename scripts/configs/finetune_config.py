@@ -1,3 +1,4 @@
+from crossformer.data.oxe import make_oxe_dataset_kwargs_and_weights
 from ml_collections import ConfigDict
 from ml_collections.config_dict import FieldReference, placeholder
 
@@ -15,56 +16,62 @@ def get_config():
     task = "multimodal"
 
     # the name of the action head to finetune
-    head_name = "single_arm"
+    head_name = "new_single_arm_joint"
 
     assert task in ["image_conditioned", "language_conditioned", "multimodal"]
     assert mode in ["full", "head_only"]
 
     # fill this in to configure data loading for your dataset.
-    FINETUNING_KWARGS = dict(
-        name="bridge_dataset",
-        data_dir="",
-        image_obs_keys={"primary": "image_0"},
-        proprio_obs_keys={},
-        language_key="language_instruction",
-        action_proprio_normalization_type="normal",
-        # We want to avoid normalizing the gripper
-        action_normalization_mask=[True, True, True, True, True, True, False],
-        # standardize_fn is dynamically loaded from a file
-        standardize_fn=ModuleSpec.create(
-            "crossformer.data.oxe.oxe_standardization_transforms:bridge_dataset_transform",
-        ),
-        # If the default data loading speed is too slow, try these:
-        # "num_parallel_reads": 8,  # for reading from disk / GCS
-        # "num_parallel_calls": 16,  # for initial dataset construction
-    )
+    # FINETUNING_KWARGS = dict(
+    #     name="bridge_dataset",
+    #     data_dir="",
+    #     image_obs_keys={"primary": "image_0"},
+    #     proprio_obs_keys={},
+    #     language_key="language_instruction",
+    #     action_proprio_normalization_type="normal",
+    #     # We want to avoid normalizing the gripper
+    #     action_normalization_mask=[True, True, True, True, True, True, False],
+    #     # standardize_fn is dynamically loaded from a file
+    #     standardize_fn=ModuleSpec.create(
+    #         "crossformer.data.oxe.oxe_standardization_transforms:bridge_dataset_transform",
+    #     ),
+    #     # If the default data loading speed is too slow, try these:
+    #     # "num_parallel_reads": 8,  # for reading from disk / GCS
+    #     # "num_parallel_calls": 16,  # for initial dataset construction
+    # )
+
+    FINETUNING_KWARGS = make_oxe_dataset_kwargs_and_weights(
+        "kit_irl_real_kitchen_lang",
+        "/home/reuss/tensorflow_datasets",
+        load_camera_views=("primary", "secondary"),
+    )[0][0]
 
     # an example of how to add a new observation tokenizer and action head
     UPDATE_CONFIG = dict(
         model=dict(
             observation_tokenizers=dict(
-                new_primary=ModuleSpec.create(
+                new_secondary=ModuleSpec.create(
                     ImageTokenizer,
-                    obs_stack_keys=["image_primary"],
-                    task_stack_keys=["image_primary"],
+                    obs_stack_keys=["image_secondary"],
+                    task_stack_keys=["image_secondary"],
                     task_film_keys=["language_instruction"],
                     encoder=ModuleSpec.create(ResNet26FILM),
                 )
             ),
             heads=dict(
-                new_single_arm=ModuleSpec.create(
+                new_single_arm_joint=ModuleSpec.create(
                     L1ActionHead,
                     action_horizon=4,
-                    action_dim=7,
-                    num_preds=7,
+                    action_dim=8,
+                    num_preds=8,
                     pool_strategy="pass",
-                    readout_key="readout_new_single_arm",
+                    readout_key="readout_new_single_arm_joint",
                     clip_pred=False,
                     loss_weight=1.0,
                     constrain_loss_dims=True,
                 ),
             ),
-            readouts=dict(new_single_arm=4),
+            readouts=dict(new_single_arm_joint=4),
         )
     )
 
@@ -79,7 +86,7 @@ def get_config():
     window_size = FieldReference(default=1)
 
     config = dict(
-        # update_config=UPDATE_CONFIG, # uncomment this line to add new observation tokenizer and action head
+        update_config=UPDATE_CONFIG, # uncomment this line to add new observation tokenizer and action head
         pretrained_path="hf://rail-berkeley/crossformer",
         pretrained_step=placeholder(int),
         batch_size=256,
@@ -157,13 +164,27 @@ def get_config():
             "random_hue",
         ],
     )
+    secondary_augment_kwargs = dict(
+        random_brightness=[0.1],
+        random_contrast=[0.9, 1.1],
+        random_saturation=[0.9, 1.1],
+        random_hue=[0.05],
+        augment_order=[
+            "random_brightness",
+            "random_contrast",
+            "random_saturation",
+            "random_hue",
+        ],
+    )
 
     frame_transform_kwargs = dict(
         resize_size={
             "primary": (224, 224),  # workspace (3rd person) camera is at 224x224
+            "secondary": (128, 128),  # secondary camera is at 128x128
         },
         image_augment_kwargs=dict(
             primary=workspace_augment_kwargs,
+            secondary=secondary_augment_kwargs,
         ),
     )
     # If the default data loading speed is too slow, try these:

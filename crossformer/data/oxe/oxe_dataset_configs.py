@@ -44,6 +44,13 @@ class ActionEncoding(IntEnum):
 
 
 OXE_DATASET_CONFIGS = {
+    "kit_irl_real_kitchen_lang": {
+        "image_obs_keys": {"primary": "image_top", "secondary": "image_side", "wrist": None},
+        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+        "proprio_encoding": ProprioEncoding.JOINT,
+        "action_encoding": ActionEncoding.JOINT_POS,
+        # "shuffle": False,
+    },
     "fractal20220817_data": {
         "image_obs_keys": {
             "primary": "image",

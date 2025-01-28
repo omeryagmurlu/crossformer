@@ -1,0 +1,1 @@
+python scripts/finetune.py --config scripts/configs/finetune_config.py --config.save_dir=outputs

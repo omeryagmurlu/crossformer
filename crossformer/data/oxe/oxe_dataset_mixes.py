@@ -41,6 +41,11 @@ CROSS_EMBODIMENT = [
     (name, weight * 0.15) for name, weight in OXE_MAGIC_SOUP_BALANCED
 ] + [(name, weight * 0.85) for name, weight in CROSS_EMBODIMENT_TARGET]
 
+KIT_IRL_KITCHEN = [
+    ("kit_irl_real_kitchen_lang", 1.0),
+]
+
 OXE_NAMED_MIXES = {
+    "kit_irl_real_kitchen_lang": KIT_IRL_KITCHEN,
     "cross_embodiment": CROSS_EMBODIMENT,
 }
