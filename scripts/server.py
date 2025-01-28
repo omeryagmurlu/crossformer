@@ -75,12 +75,11 @@ class HttpServer:
             self.models[name] = CrossFormerModel.load_pretrained(path, step=step)
 
         # settings for bimanual inference
-        self.head_name = "bimanual"
-        self.dataset_name = "aloha_pen_uncap_diverse_dataset"
-        self.action_dim = 14
-        self.pred_horizon = 100
+        self.head_name = "new_single_arm_joint"
+        self.action_dim = 8
+        self.pred_horizon = 4
         self.exp_weight = 0
-        self.horizon = 5
+        self.horizon = 1 # obs horizon
         self.text = None
         self.task = None
         self.rng = jax.random.PRNGKey(0)
@@ -96,15 +95,12 @@ class HttpServer:
             self.reset(payload)
             payload = {
                 "observation": {
-                    "proprio_bimanual": np.zeros((14,)),
-                    "image_high": np.zeros((224, 224, 3)),
-                    "image_left_wrist": np.zeros((224, 224, 3)),
-                    "image_right_wrist": np.zeros((224, 224, 3)),
+                    "image_primary": np.zeros((224, 224, 3)),
+                    "image_secondary": np.zeros((128, 128, 3)),
                 },
                 "modality": "l",
                 "ensemble": True,
                 "model": name,
-                "dataset_name": self.dataset_name,
             }
             for _ in range(self.horizon):
                 start = time.time()
@@ -112,6 +108,8 @@ class HttpServer:
                 print(time.time() - start)
 
         self.reset_history()
+
+        print("agent initialized")
 
     def run(self, port=8000, host="0.0.0.0"):
         self.app = FastAPI()
@@ -149,12 +147,13 @@ class HttpServer:
             obs = payload["observation"]
             for key in obs:
                 if "image" in key:
-                    obs[key] = resize(obs[key])
+                    # obs[key] = resize(obs[key])
+                    pass
                 # normalize proprioception expect for bimanual proprioception
                 if "proprio" in key and not key == "proprio_bimanual":
                     proprio_normalization_statistics = self.models[
                         model_name
-                    ].dataset_statistics[self.dataset_name][key]
+                    ].dataset_statistics[key]
                     obs[key] = (obs[key] - proprio_normalization_statistics["mean"]) / (
                         proprio_normalization_statistics["std"]
                     )
@@ -166,11 +165,10 @@ class HttpServer:
             # add batch dim
             obs = jax.tree_map(lambda x: x[None], obs)
 
-            unnormalization_statistics = self.models[model_name].dataset_statistics[
-                self.dataset_name
-            ]["action"]
+            unnormalization_statistics = self.models[model_name].dataset_statistics["action"]
 
             self.rng, key = jax.random.split(self.rng)
+            print(f"sampling for: {self.text}")
             actions = self.models[model_name].sample_actions(
                 obs,
                 self.task,
@@ -224,7 +222,7 @@ def main():
 
     # name, path, step
     paths = [
-        ("crossformer", "hf://rail-berkeley/crossformer", None),
+        ("crossformer", "/home/irl-admin/Omer/flower_baselines/crossformer/outputs/crossformer_finetune/experiment_20250127_112743", 50000),
     ]
 
     server = HttpServer(paths)
