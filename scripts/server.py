@@ -111,7 +111,7 @@ class HttpServer:
 
         print("agent initialized")
 
-    def run(self, port=8000, host="0.0.0.0"):
+    def run(self, port=8007, host="0.0.0.0"):
         self.app = FastAPI()
         self.app.post("/query")(self.sample_actions)
         self.app.post("/reset")(self.reset)
@@ -146,9 +146,8 @@ class HttpServer:
 
             obs = payload["observation"]
             for key in obs:
-                if "image" in key:
-                    # obs[key] = resize(obs[key])
-                    pass
+                if "image_secondary" in key:
+                    obs[key] = resize(obs[key], size=(128,128))
                 # normalize proprioception expect for bimanual proprioception
                 if "proprio" in key and not key == "proprio_bimanual":
                     proprio_normalization_statistics = self.models[
@@ -217,7 +216,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", help="Host to run on", default="0.0.0.0", type=str)
-    parser.add_argument("--port", help="Port to run on", default=8000, type=int)
+    parser.add_argument("--port", help="Port to run on", default=8007, type=int)
     args = parser.parse_args()
 
     # name, path, step
